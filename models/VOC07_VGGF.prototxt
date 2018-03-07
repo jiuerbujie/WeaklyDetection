@@ -1,0 +1,482 @@
+name: "segWSOD"
+input: "data"
+input_dim: 1
+input_dim: 3
+input_dim: 480
+input_dim: 338
+
+#layer {  
+#  name: "data"  
+#  type: "Input"  
+#  top: "data"  
+#  input_param { shape: { dim: 1 dim: 3 dim: 480 dim: 338 } }  
+#}  
+
+input: "rois_tmp"
+input_dim: 583
+input_dim: 5
+input_dim: 1
+input_dim: 1
+layer {
+  name: "reshape"
+  type: "Reshape"
+  bottom: "rois_tmp"
+  top: "rois_adj"
+  reshape_param {
+    shape {
+      dim: 0  # copy the dimension from below
+      dim: 0
+    }
+  }
+}
+
+#layer {
+#  name: "rois"
+#  type: "Input"
+#  top: "rois_adj"
+#  input_param {shape: {dim: 583 dim: 5}}
+#}
+# mean is rgb
+#layer {
+#  name: "data"
+#  type: "Python"
+#  top: "data"
+#  top: "rois"
+#  top: "id"
+#  python_param {
+#    module: 'SGWSOD_pylayers'
+#    layer: 'SGWSODDataLayer'
+#    param_str: "{\'imagePath\': \'../../data/VOCdevkit/VOC2007/JPEGImages\', \'mean\': (102.9801, 115.9465, 122.7717), \'imageScales\':(480,576,688,864,1200), \'imdbPath\': \'../../BMVC/prepare_imdb/TIP_07_imdb_image.mat\', \'set\':\'test\', \'random\':False}"
+#  }
+#  include {
+#    phase: TEST
+#  }
+#}
+#========= conv1-conv5 ============
+
+layer {
+  bottom: "data"
+  top: "conv1"
+  name: "conv1"
+  type: "Convolution"
+  param { decay_mult: 1.0}
+  param { decay_mult: 0.0}
+  convolution_param {
+    num_output: 64
+    kernel_size: 11
+    stride: 4
+  }
+}
+layer {
+  bottom: "conv1"
+  top: "conv1"
+  name: "relu1"
+  type: "ReLU"
+}
+layer {
+  bottom: "conv1"
+  top: "norm1"
+  name: "norm1"
+  type: "LRN"
+  lrn_param {
+    local_size: 5
+    alpha: 0.0005
+    beta: 0.75
+    k: 2
+  }
+}
+layer {
+  bottom: "norm1"
+  top: "pool1"
+  name: "pool1"
+  type: "Pooling"
+  pooling_param {
+    pool: MAX
+    kernel_size: 3
+    stride: 2
+  }
+}
+layer {
+  bottom: "pool1"
+  top: "conv2"
+  name: "conv2"
+  type: "Convolution"
+  param { decay_mult: 1.0}
+  param { decay_mult: 0.0}
+  convolution_param {
+    num_output: 256
+    pad: 2
+    kernel_size: 5
+  }
+}
+layer {
+  bottom: "conv2"
+  top: "conv2"
+  name: "relu2"
+  type: "ReLU"
+}
+layer {
+  bottom: "conv2"
+  top: "norm2"
+  name: "norm2"
+  type: "LRN"
+  lrn_param {
+    local_size: 5
+    alpha: 0.0005
+    beta: 0.75
+    k: 2
+  }
+}
+layer {
+  bottom: "norm2"
+  top: "pool2"
+  name: "pool2"
+  type: "Pooling"
+  pooling_param {
+    pool: MAX
+    kernel_size: 3
+    stride: 2
+  }
+}
+layer {
+  bottom: "pool2"
+  top: "conv3"
+  name: "conv3"
+  type: "Convolution"
+  param { decay_mult: 1.0}
+  param { decay_mult: 0.0}
+  convolution_param {
+    num_output: 256
+    pad: 1
+    kernel_size: 3
+  }
+}
+layer {
+  bottom: "conv3"
+  top: "conv3"
+  name: "relu3"
+  type: "ReLU"
+}
+layer {
+  bottom: "conv3"
+  top: "conv4"
+  name: "conv4"
+  type: "Convolution"
+  param { decay_mult: 1.0}
+  param { decay_mult: 0.0}
+  convolution_param {
+    num_output: 256
+    pad: 1
+    kernel_size: 3
+  }
+}
+layer {
+  bottom: "conv4"
+  top: "conv4"
+  name: "relu4"
+  type: "ReLU"
+}
+layer {
+  bottom: "conv4"
+  top: "conv5"
+  name: "conv5"
+  type: "Convolution"
+  param { decay_mult: 1.0}
+  param { decay_mult: 0.0}
+  convolution_param {
+    num_output: 256
+    pad: 1
+    kernel_size: 3
+  }
+}
+layer {
+  bottom: "conv5"
+  top: "conv5"
+  name: "relu5"
+  type: "ReLU"
+}
+#===== end conv1-conv5=======
+#layer {
+#  name: "adjustROI"
+#  type: "Python"
+#  bottom: "rois"
+#  bottom: "conv5"
+#  top: "rois_adj"
+#  python_param {
+#    module: "SGWSOD_pylayers"
+#    layer: "AdjustROILayer"
+#    param_str: "{\'model\': \'VGG-F\'}"
+#  }
+#  propagate_down: 0
+#  propagate_down: 0
+#}
+
+#======SPP===========
+layer {
+  name: "SPP"
+  type: "ROIPooling"
+  bottom: "conv5"
+  bottom: "rois_adj"
+  top: "xSPP"
+  roi_pooling_param {
+    pooled_w: 6
+    pooled_h: 6
+    #spatial_scale: 0.0625 # 1/16
+    spatial_scale: 1.0 # temp
+  }
+}
+#======= salFc layers
+#layer {
+#  name: "salFc1"
+#  type: "Convolution"
+#  bottom: "xSPP"
+#  top: "xSalFc1"
+#  convolution_param {
+#    num_output: 512
+#    pad: 0
+#    kernel_h: 6
+#    kernel_w: 6
+#  }
+#}
+layer {
+  name: "salFc1"
+  type: "InnerProduct"
+  bottom: "xSPP"
+  top: "xSalFc1"
+  param { decay_mult: 1.0}
+  param { decay_mult: 0.0}
+  inner_product_param {
+    num_output: 512
+  }
+}
+
+layer {
+  name: "reluSal"
+  type: "ReLU"
+  bottom: "xSalFc1"
+  top: "xSalFc1"
+}
+
+layer {
+  name: "salFc2"
+  type: "InnerProduct"
+  bottom: "xSalFc1"
+  top: "xSalFc2"
+  inner_product_param {
+    num_output: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+}
+
+layer {
+  name: "salScore"
+  type: "Sigmoid"
+  bottom: "xSalFc2"
+  top: "xSalPre"
+}
+
+layer {
+  name: "salShift"
+  bottom: "xSalPre"
+  top: "xSalPreShift"
+  type: "Power"
+  power_param {
+    power: 1.0
+    scale: 1.0
+    shift: 1.0
+  }
+}
+layer {
+  name: "reshape"
+  type: "Reshape"
+  bottom: "xSalPreShift"
+  top: "xSalPreShift_rs"
+  reshape_param {
+    shape {
+      dim: 0  # copy the dimension from below
+    }
+  }
+}
+
+layer {
+  name: "boostBox"
+  type: "Scale"
+  bottom: "xSPP"
+  bottom: "xSalPreShift_rs"
+  top: "xBoostBox"
+  scale_param {
+    axis: 0
+  }
+}
+
+#layer {
+#  name: "boostBox"
+#  type: "Python"
+#  bottom: "xSPP"
+#  bottom: "xSalPreShift"
+#  top: "xBoostBox"
+#  python_param {
+#    module: "SGWSOD_pylayers"
+#    layer: "BiasSampleLayer"
+#    param_str: "{\'scale\': 1.0,\'offset\':0.0}"
+#  }
+#  propagate_down: 1
+#  propagate_down: 1
+#}
+
+#layer {
+#  name: "fc6"
+#  type: "Convolution"
+#  bottom: "xBoostBox"
+#  top: "fc6"
+#  convolution_param {
+#    num_output: 4096
+#    pad: 0
+#    kernel_h: 6
+#    kernel_w: 6
+#  }
+#}
+
+layer {
+  bottom: "xBoostBox"
+  top: "fc6"
+  name: "fc6"
+  type: "InnerProduct"
+  param { decay_mult: 1.0}
+  param { decay_mult: 0.0}
+  inner_product_param {
+    num_output: 4096
+  }
+}
+
+layer {
+  name: "relu6"
+  type: "ReLU"
+  bottom: "fc6"
+  top: "fc6"
+}
+#layer {
+#  name: "drop6"
+#  type: "Dropout"
+#  bottom: "fc6"
+#  top: "fc6"
+#  dropout_param {
+#    dropout_ratio: 0.5
+#    scale_train: false
+#  }
+#}
+layer {
+  name: "fc7"
+  type: "InnerProduct"
+  bottom: "fc6"
+  top: "fc7"
+    param { lr_mult: 1.0 decay_mult: 1.0}
+    param { lr_mult: 2.0 decay_mult: 0.0}
+  inner_product_param {
+    num_output: 4096
+  }
+}
+layer {
+  name: "relu7"
+  type: "ReLU"
+  bottom: "fc7"
+  top: "fc7"
+}
+#layer {
+#  name: "drop7"
+#  type: "Dropout"
+#  bottom: "fc7"
+#  top: "fc7"
+#  dropout_param {
+#    dropout_ratio: 0.5
+#    scale_train: false
+#  }
+#}
+#===========fc8C=============
+layer {
+  name: "fc8C"
+  type: "InnerProduct"
+  bottom: "fc7"
+  top: "xFc8C"
+    param { lr_mult: 1.0 decay_mult: 1.0}
+    param { lr_mult: 2.0 decay_mult: 0.0}
+  inner_product_param {
+    num_output: 20
+    weight_filler {
+      type: "gaussian"
+      mean: 0.0
+      std: 0.01
+    }
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+}
+layer {
+  name: "softmaxCls"
+  type: "Softmax"
+  bottom: "xFc8C"
+  top: "xSoftmaxCls"
+  softmax_param {
+    axis: 1
+  }
+}
+#============fc8R========
+layer {
+  name: "fc8R"
+  type: "InnerProduct"
+  bottom: "fc7"
+  top: "xFc8R"
+    param { lr_mult: 1.0 decay_mult: 1.0}
+    param { lr_mult: 2.0 decay_mult: 0.0}
+  inner_product_param {
+    num_output: 20
+    weight_filler {
+      type: "gaussian"
+      mean: 0.0
+      std: 0.01
+    }
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+}
+layer {
+  name: "Fc8RTemp"
+  bottom: "xFc8R"
+  top: "xFc8RTemp"
+  type: "Power"
+  power_param {
+    power: 1.0
+    scale: 0.5
+    shift: 0.0
+  }
+}
+layer {
+  name: "softmaxDet"
+  type: "Softmax"
+  bottom: "xFc8RTemp"
+  top: "xSoftmaxDet"
+  softmax_param {
+    axis: 0
+  }
+}
+#===========Times========
+layer {
+  name: "Times"
+  type: "Eltwise"
+  bottom: "xSoftmaxCls"
+  bottom: "xSoftmaxDet"
+  top: "xTimes"
+  eltwise_param {
+    operation: PROD
+  }
+}
