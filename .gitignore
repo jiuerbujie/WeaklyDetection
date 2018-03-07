@@ -1,0 +1,9 @@
+*.mat
+*.png
+*.jpg
+*.caffemodel
+*.pyc
+*.pickle
+exp/*
+
+
